@@ -3,18 +3,18 @@ device: auto
 torch_num_threads: 1
 
 model:
-  hidden_dim: 128
-  num_layers: 2
+  hidden_dim: 256
+  num_layers: 4
   use_gru: false
 
 training:
-  batch_size: 128
-  updates: 2000
+  batch_size: 256
+  updates: 6000
   smoke_updates: 120
-  train_sequence_length: 64
-  learning_rate: 1.0e-3
-  grad_clip_norm: 10.0
-  eval_every: 200
+  train_sequence_length: 128
+  learning_rate: 5.0e-4
+  grad_clip_norm: 5.0
+  eval_every: 300
   smoke_eval_every: 20
   val_horizon: 200
   max_val_windows: 128
@@ -23,8 +23,8 @@ training:
 
 loss:
   one_step_weight: 1.0
-  rollout_weight: 1.0
-  rollout_train_horizon: 15
+  rollout_weight: 2.0
+  rollout_train_horizon: 30
 
 eval:
   warmup_steps: 10
