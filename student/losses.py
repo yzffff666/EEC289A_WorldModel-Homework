@@ -29,6 +29,9 @@ def rollout_loss(
     tail_weight: float = 1.0,
     hard_fraction: float = 0.0,
     hard_weight: float = 0.0,
+    vpt_focus_horizon: int = 0,
+    vpt_margin: float = 0.25,
+    vpt_weight: float = 0.0,
 ) -> torch.Tensor:
     # Train local open-loop stability at random positions, not only at the
     # beginning of each stored window.
@@ -50,6 +53,7 @@ def rollout_loss(
     pred_norm = normalizer.normalize_obs(preds)
     target_norm = normalizer.normalize_obs(targets)
     per_window_step = (pred_norm - target_norm).square().mean(dim=2)
+    raw_per_window_step = per_window_step
     if float(tail_weight) > 1.0 and int(horizon) > 1:
         weights = torch.linspace(1.0, float(tail_weight), int(horizon), device=states.device)
         weights = weights / weights.mean()
@@ -60,6 +64,10 @@ def rollout_loss(
         k = max(1, int(per_window.shape[0] * float(hard_fraction)))
         hard = torch.topk(per_window, k=k, largest=True).values.mean()
         loss = loss + float(hard_weight) * hard
+    if float(vpt_weight) > 0.0 and int(vpt_focus_horizon) > 0:
+        focus = raw_per_window_step[:, : min(int(vpt_focus_horizon), int(horizon))]
+        threshold_penalty = F.relu(focus - float(vpt_margin)).mean()
+        loss = loss + float(vpt_weight) * threshold_penalty
     return loss
 
 
@@ -73,6 +81,9 @@ def compute_loss(model, batch: dict[str, torch.Tensor], normalizer, cfg: dict):
     tail_weight = float(loss_cfg.get("rollout_tail_weight", 1.0))
     hard_fraction = float(loss_cfg.get("rollout_hard_fraction", 0.0))
     hard_weight = float(loss_cfg.get("rollout_hard_weight", 0.0))
+    vpt_focus_horizon = int(loss_cfg.get("vpt_focus_horizon", 0))
+    vpt_margin = float(loss_cfg.get("vpt_margin", 0.25))
+    vpt_weight = float(loss_cfg.get("vpt_weight", 0.0))
     roll = rollout_loss(
         model,
         states,
@@ -83,6 +94,9 @@ def compute_loss(model, batch: dict[str, torch.Tensor], normalizer, cfg: dict):
         tail_weight=tail_weight,
         hard_fraction=hard_fraction,
         hard_weight=hard_weight,
+        vpt_focus_horizon=vpt_focus_horizon,
+        vpt_margin=vpt_margin,
+        vpt_weight=vpt_weight,
     )
     total = float(loss_cfg.get("one_step_weight", 1.0)) * one + float(loss_cfg.get("rollout_weight", 0.3)) * roll
     return total, {
