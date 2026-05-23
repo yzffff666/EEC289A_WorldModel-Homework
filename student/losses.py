@@ -19,7 +19,15 @@ def one_step_delta_loss(model, states: torch.Tensor, actions: torch.Tensor, norm
     return F.mse_loss(pred_norm, target_norm)
 
 
-def rollout_loss(model, states: torch.Tensor, actions: torch.Tensor, normalizer, warmup_steps: int, horizon: int) -> torch.Tensor:
+def rollout_loss(
+    model,
+    states: torch.Tensor,
+    actions: torch.Tensor,
+    normalizer,
+    warmup_steps: int,
+    horizon: int,
+    tail_weight: float = 1.0,
+) -> torch.Tensor:
     # Train local open-loop stability at random positions, not only at the
     # beginning of each stored window.
     needed_states = int(warmup_steps) + int(horizon) + 1
@@ -39,7 +47,12 @@ def rollout_loss(model, states: torch.Tensor, actions: torch.Tensor, normalizer,
     targets = sub_states[:, warmup_steps + 1 : warmup_steps + 1 + horizon]
     pred_norm = normalizer.normalize_obs(preds)
     target_norm = normalizer.normalize_obs(targets)
-    return F.mse_loss(pred_norm, target_norm)
+    per_step = (pred_norm - target_norm).square().mean(dim=(0, 2))
+    if float(tail_weight) <= 1.0 or int(horizon) <= 1:
+        return per_step.mean()
+    weights = torch.linspace(1.0, float(tail_weight), int(horizon), device=states.device)
+    weights = weights / weights.mean()
+    return (per_step * weights).mean()
 
 
 def compute_loss(model, batch: dict[str, torch.Tensor], normalizer, cfg: dict):
@@ -49,7 +62,16 @@ def compute_loss(model, batch: dict[str, torch.Tensor], normalizer, cfg: dict):
     one = one_step_delta_loss(model, states, actions, normalizer)
     horizon = int(loss_cfg.get("rollout_train_horizon", 5))
     warmup = int(cfg["eval"].get("warmup_steps", 5))
-    roll = rollout_loss(model, states, actions, normalizer, warmup_steps=warmup, horizon=horizon)
+    tail_weight = float(loss_cfg.get("rollout_tail_weight", 1.0))
+    roll = rollout_loss(
+        model,
+        states,
+        actions,
+        normalizer,
+        warmup_steps=warmup,
+        horizon=horizon,
+        tail_weight=tail_weight,
+    )
     total = float(loss_cfg.get("one_step_weight", 1.0)) * one + float(loss_cfg.get("rollout_weight", 0.3)) * roll
     return total, {
         "loss/total": float(total.detach().cpu()),
