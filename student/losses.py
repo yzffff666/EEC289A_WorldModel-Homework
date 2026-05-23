@@ -27,6 +27,8 @@ def rollout_loss(
     warmup_steps: int,
     horizon: int,
     tail_weight: float = 1.0,
+    hard_fraction: float = 0.0,
+    hard_weight: float = 0.0,
 ) -> torch.Tensor:
     # Train local open-loop stability at random positions, not only at the
     # beginning of each stored window.
@@ -47,12 +49,18 @@ def rollout_loss(
     targets = sub_states[:, warmup_steps + 1 : warmup_steps + 1 + horizon]
     pred_norm = normalizer.normalize_obs(preds)
     target_norm = normalizer.normalize_obs(targets)
-    per_step = (pred_norm - target_norm).square().mean(dim=(0, 2))
-    if float(tail_weight) <= 1.0 or int(horizon) <= 1:
-        return per_step.mean()
-    weights = torch.linspace(1.0, float(tail_weight), int(horizon), device=states.device)
-    weights = weights / weights.mean()
-    return (per_step * weights).mean()
+    per_window_step = (pred_norm - target_norm).square().mean(dim=2)
+    if float(tail_weight) > 1.0 and int(horizon) > 1:
+        weights = torch.linspace(1.0, float(tail_weight), int(horizon), device=states.device)
+        weights = weights / weights.mean()
+        per_window_step = per_window_step * weights.unsqueeze(0)
+    per_window = per_window_step.mean(dim=1)
+    loss = per_window.mean()
+    if float(hard_weight) > 0.0 and float(hard_fraction) > 0.0:
+        k = max(1, int(per_window.shape[0] * float(hard_fraction)))
+        hard = torch.topk(per_window, k=k, largest=True).values.mean()
+        loss = loss + float(hard_weight) * hard
+    return loss
 
 
 def compute_loss(model, batch: dict[str, torch.Tensor], normalizer, cfg: dict):
@@ -63,6 +71,8 @@ def compute_loss(model, batch: dict[str, torch.Tensor], normalizer, cfg: dict):
     horizon = int(loss_cfg.get("rollout_train_horizon", 5))
     warmup = int(cfg["eval"].get("warmup_steps", 5))
     tail_weight = float(loss_cfg.get("rollout_tail_weight", 1.0))
+    hard_fraction = float(loss_cfg.get("rollout_hard_fraction", 0.0))
+    hard_weight = float(loss_cfg.get("rollout_hard_weight", 0.0))
     roll = rollout_loss(
         model,
         states,
@@ -71,6 +81,8 @@ def compute_loss(model, batch: dict[str, torch.Tensor], normalizer, cfg: dict):
         warmup_steps=warmup,
         horizon=horizon,
         tail_weight=tail_weight,
+        hard_fraction=hard_fraction,
+        hard_weight=hard_weight,
     )
     total = float(loss_cfg.get("one_step_weight", 1.0)) * one + float(loss_cfg.get("rollout_weight", 0.3)) * roll
     return total, {
