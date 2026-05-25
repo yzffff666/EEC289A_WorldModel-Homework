@@ -9,6 +9,20 @@ from .rollout import open_loop_rollout
 
 
 def one_step_delta_loss(model, states: torch.Tensor, actions: torch.Tensor, normalizer) -> torch.Tensor:
+    if bool(getattr(model, "use_gru", False)):
+        hidden = model.initial_hidden(states.shape[0], states.device)
+        losses = []
+        for t in range(actions.shape[1]):
+            obs = states[:, t]
+            act = actions[:, t]
+            target_delta = states[:, t + 1] - states[:, t]
+            obs_norm = normalizer.normalize_obs(obs)
+            act_norm = normalizer.normalize_act(act)
+            target_norm = normalizer.normalize_delta(target_delta)
+            pred_norm, hidden = model(obs_norm, act_norm, hidden)
+            losses.append(F.mse_loss(pred_norm, target_norm, reduction="none").mean(dim=1))
+        return torch.stack(losses, dim=1).mean()
+
     obs = states[:, :-1].reshape(-1, states.shape[-1])
     act = actions.reshape(-1, actions.shape[-1])
     target_delta = (states[:, 1:] - states[:, :-1]).reshape(-1, states.shape[-1])
