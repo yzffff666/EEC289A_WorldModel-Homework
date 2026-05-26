@@ -23,16 +23,16 @@ training:
 
 loss:
   one_step_weight: 0.8
-  rollout_weight: 2.7
-  rollout_train_horizon: 55
-  rollout_tail_weight: 1.5
+  rollout_weight: 2.6
+  rollout_train_horizon: 50
+  rollout_tail_weight: 1.4
   rollout_hard_fraction: 0.0
   rollout_hard_weight: 0.0
   vpt_focus_horizon: 20
-  vpt_margin: 0.22
-  vpt_weight: 0.30
+  vpt_margin: 0.21
+  vpt_weight: 0.38
   stability_bound: 3.0
-  stability_weight: 0.05
+  stability_weight: 0.04
 
 eval:
   warmup_steps: 10
