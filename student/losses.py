@@ -46,6 +46,8 @@ def rollout_loss(
     vpt_focus_horizon: int = 0,
     vpt_margin: float = 0.25,
     vpt_weight: float = 0.0,
+    vpt_hard_fraction: float = 0.0,
+    vpt_hard_weight: float = 0.0,
     stability_bound: float = 0.0,
     stability_weight: float = 0.0,
 ) -> torch.Tensor:
@@ -84,6 +86,11 @@ def rollout_loss(
         focus = raw_per_window_step[:, : min(int(vpt_focus_horizon), int(horizon))]
         threshold_penalty = F.relu(focus - float(vpt_margin)).mean()
         loss = loss + float(vpt_weight) * threshold_penalty
+        if float(vpt_hard_weight) > 0.0 and float(vpt_hard_fraction) > 0.0:
+            per_window_excess = F.relu(focus - float(vpt_margin)).mean(dim=1)
+            k = max(1, int(per_window_excess.shape[0] * float(vpt_hard_fraction)))
+            hard_excess = torch.topk(per_window_excess, k=k, largest=True).values.mean()
+            loss = loss + float(vpt_hard_weight) * hard_excess
     if float(stability_weight) > 0.0 and float(stability_bound) > 0.0:
         excess = F.relu(pred_norm.abs() - float(stability_bound))
         loss = loss + float(stability_weight) * excess.square().mean()
@@ -103,6 +110,8 @@ def compute_loss(model, batch: dict[str, torch.Tensor], normalizer, cfg: dict):
     vpt_focus_horizon = int(loss_cfg.get("vpt_focus_horizon", 0))
     vpt_margin = float(loss_cfg.get("vpt_margin", 0.25))
     vpt_weight = float(loss_cfg.get("vpt_weight", 0.0))
+    vpt_hard_fraction = float(loss_cfg.get("vpt_hard_fraction", 0.0))
+    vpt_hard_weight = float(loss_cfg.get("vpt_hard_weight", 0.0))
     stability_bound = float(loss_cfg.get("stability_bound", 0.0))
     stability_weight = float(loss_cfg.get("stability_weight", 0.0))
     roll = rollout_loss(
@@ -118,6 +127,8 @@ def compute_loss(model, batch: dict[str, torch.Tensor], normalizer, cfg: dict):
         vpt_focus_horizon=vpt_focus_horizon,
         vpt_margin=vpt_margin,
         vpt_weight=vpt_weight,
+        vpt_hard_fraction=vpt_hard_fraction,
+        vpt_hard_weight=vpt_hard_weight,
         stability_bound=stability_bound,
         stability_weight=stability_weight,
     )

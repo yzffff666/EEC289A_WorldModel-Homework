@@ -28,11 +28,13 @@ loss:
   rollout_tail_weight: 1.5
   rollout_hard_fraction: 0.0
   rollout_hard_weight: 0.0
-  vpt_focus_horizon: 20
-  vpt_margin: 0.215
-  vpt_weight: 0.34
+  vpt_focus_horizon: 30
+  vpt_margin: 0.22
+  vpt_weight: 0.25
+  vpt_hard_fraction: 0.30
+  vpt_hard_weight: 0.25
   stability_bound: 3.0
-  stability_weight: 0.05
+  stability_weight: 0.055
 
 eval:
   warmup_steps: 10
