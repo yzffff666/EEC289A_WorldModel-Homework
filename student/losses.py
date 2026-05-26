@@ -67,7 +67,7 @@ def rollout_loss(
     elif num_starts == 1:
         starts = [int(torch.randint(0, max_start + 1, (), device=states.device).item())]
     else:
-        starts = torch.linspace(0, max_start, num_starts, device=states.device).round().to(torch.long).tolist()
+        starts = [round(i * max_start / (num_starts - 1)) for i in range(num_starts)]
 
     losses = []
     for start in starts:
