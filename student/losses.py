@@ -122,7 +122,7 @@ def _single_rollout_loss(
     per_window_step = (pred_norm - target_norm).square().mean(dim=2)
     raw_per_window_step = per_window_step
     if float(tail_weight) > 1.0 and int(horizon) > 1:
-        weights = torch.linspace(1.0, float(tail_weight), int(horizon), device=states.device)
+        weights = torch.linspace(1.0, float(tail_weight), int(horizon), device=sub_states.device)
         weights = weights / weights.mean()
         per_window_step = per_window_step * weights.unsqueeze(0)
     per_window = per_window_step.mean(dim=1)
