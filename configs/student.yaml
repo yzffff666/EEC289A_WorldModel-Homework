@@ -9,15 +9,15 @@ model:
 
 training:
   batch_size: 128
-  updates: 12000
+  updates: 16000
   smoke_updates: 120
   train_sequence_length: 112
   learning_rate: 3.0e-4
   grad_clip_norm: 3.0
-  eval_every: 600
+  eval_every: 400
   smoke_eval_every: 20
   val_horizon: 200
-  max_val_windows: 128
+  max_val_windows: 256
   checkpoint_metric: val/VPT80@0.25
   checkpoint_mode: max
 
