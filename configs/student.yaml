@@ -18,8 +18,8 @@ training:
   smoke_eval_every: 20
   val_horizon: 200
   max_val_windows: 256
-  checkpoint_metric: val/nMSE@10
-  checkpoint_mode: min
+  checkpoint_metric: val/VPT80@0.25
+  checkpoint_mode: max
 
 loss:
   one_step_weight: 0.8
